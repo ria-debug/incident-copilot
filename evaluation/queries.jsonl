@@ -1,0 +1,38 @@
+// Labelled retrieval queries. Relevance is judged at DOCUMENT level so the labels
+// survive a change of chunking strategy — chunk-level labels would have to be
+// redone for every ablation cell, which would make the ablation impossible.
+//
+// Queries are deliberately phrased the way an engineer types mid-incident, not
+// the way the documents are titled. A query set written in the corpus's own
+// vocabulary measures string matching and flatters any retriever.
+{"id": "q01", "text": "api is slow but cpu and memory look totally fine", "relevant_docs": ["connection-pool-exhaustion", "api-latency-degradation"], "tags": ["symptom-phrasing", "latency"], "note": "Never says 'pool'. The whole test is whether the symptom description reaches the right runbook."}
+{"id": "q02", "text": "requests are timing out with 504 but the database is healthy", "relevant_docs": ["connection-pool-exhaustion"], "tags": ["symptom-phrasing"]}
+{"id": "q03", "text": "should I increase the max connections to fix pool saturation", "relevant_docs": ["connection-pool-exhaustion", "service-dependency-map"], "tags": ["do-not", "multi-doc"], "note": "Two documents warn against this for different reasons; both are relevant."}
+{"id": "q04", "text": "traffic dropped to zero all at once and there is nothing in the application logs", "relevant_docs": ["tls-certificate-expiry", "2026-06-21-certificate-outage"], "tags": ["symptom-phrasing", "multi-doc"]}
+{"id": "q05", "text": "how do I know if a certificate expired", "relevant_docs": ["tls-certificate-expiry"], "tags": ["procedure"]}
+{"id": "q06", "text": "can I turn off tls verification to get traffic back up", "relevant_docs": ["tls-certificate-expiry", "escalation-policy"], "tags": ["do-not", "authorisation", "multi-doc"]}
+{"id": "q07", "text": "why did nobody get paged before the cert expired", "relevant_docs": ["2026-06-21-certificate-outage", "alerting-thresholds", "tls-certificate-expiry"], "tags": ["root-cause", "multi-doc"]}
+{"id": "q08", "text": "p99 latency alert fired, what do I check first", "relevant_docs": ["api-latency-degradation"], "tags": ["procedure"]}
+{"id": "q09", "text": "several unrelated services are all slow at the same time", "relevant_docs": ["api-latency-degradation", "service-dependency-map"], "tags": ["symptom-phrasing", "multi-doc"]}
+{"id": "q10", "text": "container is being throttled but utilisation is under the limit", "relevant_docs": ["api-latency-degradation"], "tags": ["signature"]}
+{"id": "q11", "text": "lag is only growing on one partition", "relevant_docs": ["kafka-consumer-lag"], "tags": ["signature"]}
+{"id": "q12", "text": "can I just reset offsets to clear the backlog", "relevant_docs": ["kafka-consumer-lag", "escalation-policy"], "tags": ["do-not", "authorisation", "multi-doc"]}
+{"id": "q13", "text": "consumer looks healthy but lag keeps growing", "relevant_docs": ["kafka-consumer-lag", "2026-05-02-batch-overrun"], "tags": ["symptom-phrasing", "multi-doc"]}
+{"id": "q14", "text": "the nightly batch finished hours late and nothing alerted", "relevant_docs": ["2026-05-02-batch-overrun", "alerting-thresholds"], "tags": ["root-cause", "multi-doc"]}
+{"id": "q15", "text": "a bunch of different pods restarted on the same node", "relevant_docs": ["disk-pressure-eviction"], "tags": ["symptom-phrasing"]}
+{"id": "q16", "text": "node is running out of space, what usually causes that", "relevant_docs": ["disk-pressure-eviction"], "tags": ["cause"]}
+{"id": "q17", "text": "users are getting logged out but auth service says it is healthy", "relevant_docs": ["auth-401-spike"], "tags": ["symptom-phrasing"]}
+{"id": "q18", "text": "401 errors started exactly when we rotated the signing key", "relevant_docs": ["auth-401-spike"], "tags": ["signature"]}
+{"id": "q19", "text": "401s only on one node, token has not expired yet", "relevant_docs": ["auth-401-spike"], "tags": ["signature"]}
+{"id": "q20", "text": "what am I allowed to do without approval during an incident", "relevant_docs": ["escalation-policy"], "tags": ["authorisation"]}
+{"id": "q21", "text": "when do I need to escalate a P2", "relevant_docs": ["escalation-policy"], "tags": ["procedure"]}
+{"id": "q22", "text": "how often should I post updates during a P1", "relevant_docs": ["escalation-policy"], "tags": ["procedure"]}
+{"id": "q23", "text": "which services break if the gateway goes down", "relevant_docs": ["service-dependency-map"], "tags": ["dependency"]}
+{"id": "q24", "text": "latency regression right after a deploy, has this happened before", "relevant_docs": ["2026-03-14-payments-degradation", "api-latency-degradation", "connection-pool-exhaustion"], "tags": ["history", "multi-doc"]}
+{"id": "q25", "text": "why was the pool checked so late in the payments incident", "relevant_docs": ["2026-03-14-payments-degradation"], "tags": ["root-cause"]}
+// Unanswerable: the corpus genuinely does not cover these. They test abstention,
+// which is the behaviour that separates a usable incident tool from a confident
+// liar. Excluded from retrieval metrics — there is no relevant document to recall.
+{"id": "u01", "text": "how do I roll back a redis cluster upgrade", "relevant_docs": [], "unanswerable": true, "tags": ["abstention"], "note": "No redis document exists."}
+{"id": "u02", "text": "what is our RPO for the customer data warehouse", "relevant_docs": [], "unanswerable": true, "tags": ["abstention"], "note": "No DR or RPO document exists."}
+{"id": "u03", "text": "which team owns the mobile push notification service", "relevant_docs": [], "unanswerable": true, "tags": ["abstention"], "note": "Service not in the dependency map."}
