@@ -1,4 +1,4 @@
-# What failed, and what the numbers said instead
+# What the ablation found
 
 Every result here comes from `incident-copilot ablate` — 45 configurations over 25 labelled queries, reproducible offline in about a second. Raw data is in `results/ablation.json`.
 
@@ -6,7 +6,7 @@ Three of my four going-in hypotheses were wrong. That is the useful part of this
 
 ---
 
-## 1. Section-aware chunking lost. It was my main hypothesis.
+## 1. Section-aware chunking underperforms, and the chunk-count column explains why
 
 I expected splitting on markdown headings to beat arbitrary boundaries. Operational documents *are* written in retrievable units — one heading is one procedure — so honouring the author's structure should have won.
 
@@ -30,7 +30,7 @@ Head-to-head at size 180 with BM25, the gap is wider than the average suggests:
 
 The lesson generalises past this corpus: a chunking strategy is a claim about *document structure*, and it is only as good as that claim. My claim was true about the documents I imagined and false about the ones I wrote.
 
-## 2. The `size` parameter does nothing for section chunking. I didn't notice until I read the table.
+## 2. The `size` parameter is inert for section chunking above 120 words
 
 | size | chunks | mean words | R@3 | MRR |
 |---:|---:|---:|---:|---:|
@@ -44,7 +44,7 @@ Identical from 120 words upward. `size` is only a *ceiling* in `chunk_section` �
 
 I would not have caught this by reading the code; it looks like it works. I caught it because the sweep printed five identical rows, which is a thing only a sweep does. Had I tuned section chunking by hand I would have concluded the size was well-chosen, when in fact it was never being applied.
 
-## 3. Domain query expansion bought nothing on recall, and cost some.
+## 3. Domain query expansion trades recall for precision
 
 I hand-built a synonym map — "slow" → latency/p99/degraded, "stuck" → deadlock/blocked/timeout — expecting it to bridge the gap between how engineers type and how docs are written. At the winning config:
 
@@ -57,7 +57,7 @@ Recall@3 identical. **Recall@5 got worse** (0.980 → 0.960) — expansion terms
 
 The trade is coherent in hindsight: expansion sharpens the top of the ranking and blurs the tail. But I built it expecting a recall win, and it delivered the opposite. Averaged across all 45 cells, expansion is *behind* plain BM25 (0.849 vs 0.853).
 
-## 4. Hybrid rank fusion was pure overhead.
+## 4. Hybrid rank fusion adds cost without adding signal
 
 Reciprocal-rank fusion over BM25 + expanded-BM25 matched plain BM25 exactly on R@1, R@3, R@5, and MRR at the winning config, differing only on precision@3 (0.560 vs 0.547). Marginal means across the whole sweep: bm25 0.853, hybrid_rrf 0.851.
 
@@ -65,7 +65,7 @@ Fusion helps when the fused retrievers fail *differently*. Mine were BM25 and BM
 
 **The default is now plain BM25.** The simplest of the three retrievers, chosen because the data gave no reason to pay for either of the others.
 
-## 5. Picking on a single metric would have shipped the wrong retriever.
+## 5. A single metric is not enough to pick a retriever
 
 The top result by recall@3 is not the best retriever:
 
@@ -80,7 +80,7 @@ Shipping `fixed/120` would have been defensible from the number I happened to so
 
 ---
 
-## Still wrong, or untested
+## Open questions and known limits
 
 - **No dense retrieval.** Everything here is lexical. The failure mode BM25 cannot fix is a query sharing no vocabulary with a relevant document, and my synonym map is a manual patch over that gap rather than a solution. An embedding retriever is the highest-value next experiment, and finding 4 predicts fusion would actually pay once the retrievers fail differently.
 - **25 queries is a small set.** A 0.02 difference in recall@3 is half a query. I have leaned on marginal means over 45 cells rather than single-cell comparisons for exactly this reason, but the honest read is that findings 1 and 5 are solid and the recall@5 detail in finding 3 is one query.

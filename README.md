@@ -18,14 +18,14 @@ The query never says "pool". Getting that right is a retrieval property, and no 
 
 ---
 
-## The part worth reading: [FAILURES.md](FAILURES.md)
+## The part worth reading: [FINDINGS.md](FINDINGS.md)
 
 Three of my four going-in hypotheses were wrong, and the ablation is what caught them:
 
-- **Section-aware chunking — my main hypothesis — came last.** It fragmented the corpus into 70 chunks averaging 39 words instead of 24 averaging 119, and BM25 cannot score confidently on fragments that small.
+- **Section-aware chunking — my main hypothesis — ranked last of three.** It fragmented the corpus into 70 chunks averaging 39 words instead of 24 averaging 119, and BM25 cannot score confidently on fragments that small.
 - **The `size` parameter does nothing for section chunking.** Identical results from 120 words to 400. It is only a ceiling, and almost no section is large enough to hit it. Five identical rows in a sweep is a thing only a sweep shows you; by hand I would have concluded the size was well-chosen.
-- **Domain query expansion made recall@5 *worse*** (0.980 → 0.960) while slightly improving precision. I built it expecting the opposite.
-- **Hybrid rank fusion was pure overhead** — identical to plain BM25 on every metric but one. Fusion needs retrievers that fail *differently*; mine were BM25 and BM25-with-extra-terms.
+- **Domain query expansion traded recall for precision** — recall@5 moved 0.980 → 0.960 while precision@3 improved. I built it expecting the opposite.
+- **Hybrid rank fusion added cost without signal** — identical to plain BM25 on every metric but one. Fusion needs retrievers that fail *differently*; mine were BM25 and BM25-with-extra-terms.
 - **Sorting on recall@3 alone would have shipped the worse retriever** — the R@3 winner is 0.055 behind on MRR, which is closer to what matters for someone who reads the first result.
 
 The shipped default is `sentence/180/bm25` — the simplest of the three retrievers, chosen because the data gave no reason to pay for either of the others.
@@ -78,7 +78,7 @@ incident-copilot ask "connection pool is saturated, what do I check first"
 
 ## Honest limitations
 
-- **No dense retrieval.** Everything is lexical. BM25 cannot match a query that shares no vocabulary with a relevant document, and the synonym map is a manual patch over that gap. This is the highest-value next experiment — and finding 4 in FAILURES.md predicts fusion would finally pay once the two retrievers fail differently.
+- **No dense retrieval.** Everything is lexical. BM25 cannot match a query that shares no vocabulary with a relevant document, and the synonym map is a manual patch over that gap. This is the highest-value next experiment — and finding 4 in FINDINGS.md predicts fusion would finally pay once the two retrievers fail differently.
 - **25 queries is small.** A 0.02 difference in recall@3 is half a query. Findings lean on marginal means across 45 cells rather than single-cell comparisons for that reason.
 - **The corpus is synthetic and I wrote both sides.** Knowing the answers biases query phrasing toward retrievability even when trying to avoid it. Treat *relative* configuration results as the finding and the absolute numbers as a property of this corpus.
 - **Generation is checked structurally, not semantically.** There is no faithfulness eval and no scored abstention metric.

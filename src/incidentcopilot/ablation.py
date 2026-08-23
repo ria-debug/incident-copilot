@@ -5,7 +5,7 @@ chunk size; almost nobody measures whether it was the right one. The sweep runs
 entirely offline on BM25, so re-running it after any corpus or chunking change
 costs nothing and takes a second — which is the only reason it gets re-run.
 
-Read `FAILURES.md` for what the sweep actually found, including the two results
+Read `FINDINGS.md` for what the sweep actually found, including the two results
 that contradicted what I expected going in.
 """
 

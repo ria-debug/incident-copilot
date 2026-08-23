@@ -15,7 +15,7 @@ recall@5 *worse* (0.980 -> 0.960), buying a rounding error on MRR and a small
 gain on precision@3. `RRFHybrid` fared no better — it matched plain BM25 on
 every metric but one, because fusing BM25 with BM25-plus-synonyms fuses two
 retrievers that fail the same way. Both are kept so the sweep can keep
-demonstrating that, and the shipped default is plain BM25. See FAILURES.md.
+demonstrating that, and the shipped default is plain BM25. See FINDINGS.md.
 """
 
 from __future__ import annotations

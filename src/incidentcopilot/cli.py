@@ -22,7 +22,7 @@ DEFAULT_QUERIES = ROOT / "evaluation" / "queries.jsonl"
 
 # Chosen by the ablation, not by taste — and not the configuration I expected.
 # `section` chunking (my hypothesis) came last, and neither query expansion nor
-# rank fusion beat plain BM25. See results/ablation.md and FAILURES.md.
+# rank fusion beat plain BM25. See results/ablation.md and FINDINGS.md.
 DEFAULT_STRATEGY = "sentence"
 DEFAULT_SIZE = 180
 DEFAULT_RETRIEVER = "bm25"

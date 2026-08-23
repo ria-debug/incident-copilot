@@ -62,7 +62,7 @@ def split_sentences(text: str) -> list[str]:
     Operational docs are full of abbreviations and version numbers that trip
     naive splitters, so this is imperfect — but it is deterministic, free, and
     the ablation measures whether the imperfection actually costs retrieval
-    quality. See FAILURES.md; it turned out to matter less than chunk size.
+    quality. See FINDINGS.md; it turned out to matter less than chunk size.
     """
     parts = [s.strip() for s in _SENTENCE_END.split(text) if s.strip()]
     return parts or ([text.strip()] if text.strip() else [])

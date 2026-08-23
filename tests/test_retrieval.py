@@ -224,7 +224,7 @@ def test_default_config_holds_up(chunks, queries):
 
 
 def test_ablation_reproduces_the_finding_that_section_chunking_lost():
-    """FAILURES.md finding 1. If this ever flips, the writeup is stale."""
+    """FINDINGS.md finding 1. If this ever flips, the writeup is stale."""
     docs = load_corpus(CORPUS)
     queries = load_queries(QUERIES)
     cells = sweep(docs, queries, sizes=(120, 180), retrievers=("bm25",))
