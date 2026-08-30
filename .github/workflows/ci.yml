@@ -1,0 +1,43 @@
+name: ci
+
+# The repo's claim is that retrieval is measured before it is trusted. A claim
+# nothing re-checks decays into a README assertion, so CI re-runs the whole
+# sweep and fails if the committed results no longer reproduce.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint
+        run: uv run ruff check src/ tests/ scripts/
+
+      - name: Tests
+        run: uv run pytest -q
+
+      # Everything below is offline and needs no API key: the sweep is lexical
+      # and runs in about a second. Only `ask` calls a model, and it is not
+      # exercised here.
+      - name: Retrieval scores the default config
+        run: uv run incident-copilot evaluate
+
+      - name: Ablation reproduces the committed results
+        run: |
+          uv run incident-copilot ablate --out results
+          git diff --exit-code -- results/ \
+            || { echo "::error::The ablation no longer reproduces results/. Re-run 'incident-copilot ablate' and commit the change with the finding it represents."; exit 1; }

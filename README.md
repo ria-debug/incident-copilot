@@ -1,8 +1,25 @@
 # incident-copilot
 
+[![ci](https://github.com/ria-debug/incident-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/ria-debug/incident-copilot/actions/workflows/ci.yml)
+
 **RAG over operational documentation, measured before it is trusted.**
 
 Most RAG projects pick a chunk size, wire up a vector store, and ship. This one starts from the opposite assumption: a system that answers fluently from the wrong three passages looks identical to one that works, right up until an on-call engineer runs the wrong command at 3am. So retrieval is scored on its own — recall, precision, MRR, nDCG — before any model sees a passage.
+
+```
+                                    ┌──────────────────────────┐
+ corpus ──▶ chunk ──▶ retrieve ──┬─▶│ 25 labelled queries      │──▶ recall · precision
+ 12 docs    3 ways    BM25       │  │ scored on their own      │    MRR · nDCG
+                                 │  └──────────────────────────┘    zero-recall
+                                 │        the gate: a passage never retrieved
+                                 │        cannot be recovered downstream
+                                 ▼
+                            generate ──▶ verify ──▶ answer + citations
+                            cited,       structural,   or "insufficient
+                            grounded     no 2nd call    context"
+```
+
+CI re-runs the whole sweep on every push and fails if the committed results stop reproducing — the measurement is enforced, not asserted.
 
 ```
 $ incident-copilot retrieve "api is slow but cpu and memory look fine"
@@ -40,7 +57,7 @@ The shipped default is `sentence/180/bm25` — the simplest of the three retriev
 $ incident-copilot ablate
 ```
 
-Current default config:
+Current default config — `sentence/180/bm25`, generated 2026-08-06 from the corpus and query set as committed, and re-verified by CI on every push:
 
 | metric | value |
 |---|---|

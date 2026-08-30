@@ -1,6 +1,6 @@
 # What the ablation found
 
-Every result here comes from `incident-copilot ablate` — 45 configurations over 25 labelled queries, reproducible offline in about a second. Raw data is in `results/ablation.json`.
+Every result here comes from `incident-copilot ablate` — 45 configurations over 25 labelled queries, reproducible offline in about a second. Raw data is in `results/ablation.json`, generated 2026-08-06 and re-verified by CI on every push: if the sweep stops reproducing these numbers, the build fails.
 
 Three of my four going-in hypotheses were wrong. That is the useful part of this document.
 
