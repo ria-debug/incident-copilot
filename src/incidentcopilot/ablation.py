@@ -23,6 +23,39 @@ from .retrieval import RETRIEVERS, build_retriever
 
 STRATEGIES: tuple[Strategy, ...] = ("fixed", "sentence", "section")
 SIZES: tuple[int, ...] = (80, 120, 180, 260, 400)
+OVERLAP_RATIO = 0.22
+
+
+def default_overlap(size: int, *, overlap_ratio: float = OVERLAP_RATIO) -> int:
+    """Overlap for a chunk size, used by both the sweep and the CLI.
+
+    Scales with size rather than staying fixed. A constant 40-word overlap is
+    50% of an 80-word chunk and 10% of a 400-word one, which would confound the
+    size variable with an overlap variable and make the whole sweep
+    uninterpretable. The CLI shares it so that the configuration you evaluate is
+    a configuration the ablation actually measured.
+    """
+    return max(1, int(size * overlap_ratio))
+
+
+def chunk_configs(
+    *,
+    strategies: tuple[Strategy, ...] = STRATEGIES,
+    sizes: tuple[int, ...] = SIZES,
+    overlap_ratio: float = OVERLAP_RATIO,
+) -> list[tuple[Strategy, int, int]]:
+    """Every (strategy, size, overlap) the sweep will build chunks for.
+
+    Shared with `scripts/build_embeddings.py` so the embedding cache is built
+    over exactly the chunk texts the sweep will ask for. If the two computed
+    overlap independently, a size change here would leave the dense retriever
+    silently uncovered for one row of the sweep.
+    """
+    return [
+        (s, n, default_overlap(n, overlap_ratio=overlap_ratio))
+        for s in strategies
+        for n in sizes
+    ]
 
 
 @dataclass
@@ -46,30 +79,26 @@ def sweep(
     strategies: tuple[Strategy, ...] = STRATEGIES,
     sizes: tuple[int, ...] = SIZES,
     retrievers: tuple[str, ...] = RETRIEVERS,
-    overlap_ratio: float = 0.22,
+    overlap_ratio: float = OVERLAP_RATIO,
 ) -> list[Cell]:
     cells: list[Cell] = []
-    for strategy in strategies:
-        for size in sizes:
-            # Overlap scales with size rather than staying fixed. A constant
-            # 40-word overlap is 50% of an 80-word chunk and 10% of a 400-word
-            # one, which would confound the size variable with an overlap
-            # variable and make the whole sweep uninterpretable.
-            overlap = max(1, int(size * overlap_ratio))
-            chunks = build_chunks(docs, strategy=strategy, size=size, overlap=overlap)
-            mean_words = sum(c.n_words for c in chunks) / len(chunks) if chunks else 0.0
-            for name in retrievers:
-                report = evaluate_retrieval(build_retriever(name, chunks), queries, k=5)
-                cells.append(
-                    Cell(
-                        strategy=strategy,
-                        size=size,
-                        retriever=name,
-                        n_chunks=len(chunks),
-                        mean_chunk_words=round(mean_words, 1),
-                        metrics=report.to_dict(),
-                    )
+    for strategy, size, overlap in chunk_configs(
+        strategies=strategies, sizes=sizes, overlap_ratio=overlap_ratio
+    ):
+        chunks = build_chunks(docs, strategy=strategy, size=size, overlap=overlap)
+        mean_words = sum(c.n_words for c in chunks) / len(chunks) if chunks else 0.0
+        for name in retrievers:
+            report = evaluate_retrieval(build_retriever(name, chunks), queries, k=5)
+            cells.append(
+                Cell(
+                    strategy=strategy,
+                    size=size,
+                    retriever=name,
+                    n_chunks=len(chunks),
+                    mean_chunk_words=round(mean_words, 1),
+                    metrics=report.to_dict(),
                 )
+            )
     return cells
 
 

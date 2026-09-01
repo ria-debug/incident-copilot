@@ -3,7 +3,11 @@ name = "incident-copilot"
 version = "0.1.0"
 description = "Retrieval over operational docs, measured before it is trusted: chunking ablation, recall/MRR, cited answers with a real abstention path."
 requires-python = ">=3.12"
-dependencies = ["anthropic>=0.60"]
+dependencies = [
+    "anthropic>=0.60",
+    "model2vec>=0.9.0",
+    "numpy>=2.5.2",
+]
 
 [project.scripts]
 incident-copilot = "incidentcopilot.cli:main"
