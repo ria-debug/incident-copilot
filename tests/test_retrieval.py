@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from incidentcopilot.ablation import best, marginals, sweep
+from incidentcopilot.ablation import best, chunk_configs, default_overlap, marginals, sweep
 from incidentcopilot.chunking import Chunk, chunk_document, split_sentences
 from incidentcopilot.corpus import build_chunks, load_corpus
 from incidentcopilot.evaluate import (
@@ -113,7 +113,11 @@ def test_tokenizer_keeps_metric_names_intact():
 
 @pytest.mark.parametrize("name", RETRIEVERS)
 def test_every_retriever_returns_ranked_results(name, chunks):
-    hits = build_retriever(name, chunks).search("connection pool saturation", k=5)
+    # A committed query, not an ad-hoc string: the dense retriever reads its
+    # vectors from the cache, and the suite must stay offline.
+    hits = build_retriever(name, chunks).search(
+        "should I increase the max connections to fix pool saturation", k=5
+    )
     assert hits
     assert [h.rank for h in hits] == list(range(1, len(hits) + 1))
     assert all(hits[i].score >= hits[i + 1].score for i in range(len(hits) - 1))
@@ -240,3 +244,13 @@ def test_sweep_varies_every_dimension():
     assert len(cells) == 2 * 2 * 2
     assert len({c.key for c in cells}) == len(cells)
     assert best(cells, "recall_at_3") in cells
+
+
+def test_cli_default_overlap_matches_the_configurations_the_sweep_measured():
+    """The CLI used a flat overlap of 40 while the sweep scales overlap with
+    size, so `evaluate --strategy fixed` scored a cell the ablation never ran.
+    Harmless-looking until the dense retriever made it fatal: it asked for chunk
+    text nobody had embedded, which is how this was found."""
+    swept = {size: overlap for _, size, overlap in chunk_configs(strategies=("fixed",))}
+    for size, overlap in swept.items():
+        assert default_overlap(size) == overlap, size

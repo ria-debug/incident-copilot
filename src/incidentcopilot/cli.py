@@ -11,27 +11,43 @@ import json
 import sys
 from pathlib import Path
 
-from .ablation import best, marginals, render_markdown, sweep, write_results
+from .ablation import best, default_overlap, marginals, render_markdown, sweep, write_results
 from .corpus import build_chunks, load_corpus
 from .evaluate import evaluate_retrieval, load_queries
-from .retrieval import RETRIEVERS, build_retriever
+from .retrieval import RETRIEVERS, build_retriever, default_store
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CORPUS = ROOT / "corpus"
 DEFAULT_QUERIES = ROOT / "evaluation" / "queries.jsonl"
 
 # Chosen by the ablation, not by taste — and not the configuration I expected.
-# `section` chunking (my hypothesis) came last, and neither query expansion nor
-# rank fusion beat plain BM25. See results/ablation.md and FINDINGS.md.
+# `section` chunking (my hypothesis) came last for every lexical retriever, and
+# neither query expansion nor BM25-on-BM25 fusion beat plain BM25.
+#
+# Dense retrieval changed the answer. `hybrid_dense` is the only retriever with
+# no zero-recall cell anywhere in the sweep, and it takes MRR 0.908 -> 0.973 on
+# this configuration. It is NOT the top cell by recall@3 — `fixed/180` is, by
+# 0.034 — but finding 5 is that ranking on recall@3 alone ships the retriever
+# that reads worse first, and this cell wins R@1 by 0.080 and MRR by 0.040.
+# See results/ablation.md and FINDINGS.md findings 6 and 7.
 DEFAULT_STRATEGY = "sentence"
 DEFAULT_SIZE = 180
-DEFAULT_RETRIEVER = "bm25"
+DEFAULT_RETRIEVER = "hybrid_dense"
 
 
-def _index(args):
+def _index(args, *, live: bool = False):
+    """`live` lets the dense retriever embed a query nobody has embedded before.
+
+    On for `retrieve` and `ask`, where the query is whatever the user typed. Off
+    for `evaluate`, where every query is committed and a missing vector means the
+    corpus changed and the numbers are stale — computing it silently would hide
+    the one thing worth being told.
+    """
     docs = load_corpus(Path(args.corpus))
-    chunks = build_chunks(docs, strategy=args.strategy, size=args.size, overlap=args.overlap)
-    return docs, chunks, build_retriever(args.retriever, chunks)
+    overlap = args.overlap if args.overlap is not None else default_overlap(args.size)
+    chunks = build_chunks(docs, strategy=args.strategy, size=args.size, overlap=overlap)
+    store = default_store(live=True) if live and "dense" in args.retriever else None
+    return docs, chunks, build_retriever(args.retriever, chunks, store=store)
 
 
 def _cmd_ablate(args) -> int:
@@ -67,7 +83,7 @@ def _cmd_evaluate(args) -> int:
 
 
 def _cmd_retrieve(args) -> int:
-    _, _, retriever = _index(args)
+    _, _, retriever = _index(args, live=True)
     for hit in retriever.search(args.query, k=args.k):
         print(f"[{hit.rank}] {hit.chunk.citation()}  score={hit.score:.3f}")
         print(f"    {hit.chunk.text[:220]}...\n")
@@ -78,7 +94,7 @@ def _cmd_ask(args) -> int:
     from .answer import answer_question
     from .client import ClaudeClient
 
-    _, _, retriever = _index(args)
+    _, _, retriever = _index(args, live=True)
     hits = retriever.search(args.query, k=args.k)
     result = answer_question(args.query, hits, ClaudeClient(model=args.model))
 
@@ -123,7 +139,9 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("--queries", default=str(DEFAULT_QUERIES))
         sp.add_argument("--strategy", default=DEFAULT_STRATEGY, choices=["fixed", "sentence", "section"])
         sp.add_argument("--size", type=int, default=DEFAULT_SIZE)
-        sp.add_argument("--overlap", type=int, default=40)
+        # Defaults to the sweep's size-scaled overlap, so the configuration
+        # you evaluate is one the ablation actually measured.
+        sp.add_argument("--overlap", type=int, default=None)
         sp.add_argument("--retriever", default=DEFAULT_RETRIEVER, choices=list(RETRIEVERS))
         sp.add_argument("-k", type=int, default=5)
 

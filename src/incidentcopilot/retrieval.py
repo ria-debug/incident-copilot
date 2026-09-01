@@ -24,8 +24,12 @@ import math
 import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from functools import lru_cache
+
+import numpy as np
 
 from .chunking import Chunk
+from .embeddings import DEFAULT_CACHE, EmbeddingStore
 
 _TOKEN = re.compile(r"[a-z0-9_]+")
 
@@ -179,7 +183,7 @@ class RRFHybrid:
     compare would invent a relationship that does not exist.
     """
 
-    def __init__(self, retrievers: list[BM25], *, k_rrf: int = 60):
+    def __init__(self, retrievers: list, *, k_rrf: int = 60):
         self.retrievers = retrievers
         self.k_rrf = k_rrf
 
@@ -196,14 +200,61 @@ class RRFHybrid:
         return [Hit(chunk=seen[cid], score=s, rank=i + 1) for i, (cid, s) in enumerate(ranked)]
 
 
-def build_retriever(name: str, chunks: list[Chunk]):
+class DenseRetriever:
+    """Cosine similarity over committed embedding vectors.
+
+    There is no vector database here on purpose. The corpus is 12 documents --
+    24 chunks at the shipped configuration, 70 at the most fragmented. An ANN
+    index solves a problem that starts at roughly six orders of magnitude more
+    vectors than this; at this size an exact matmul is both faster and exactly
+    right, and reaching for FAISS would be adding a moving part to look
+    serious rather than to answer a question.
+
+    Vectors are read from the cache rather than computed (see `embeddings.py`),
+    which is what keeps the 75-cell sweep offline and reproducible.
+    """
+
+    def __init__(self, chunks: list[Chunk], store: EmbeddingStore):
+        self.chunks = chunks
+        self.store = store
+        self.matrix = (
+            store.encode([c.text for c in chunks]) if chunks else np.zeros((0, 1), dtype=np.float32)
+        )
+
+    def search(self, query: str, k: int = 5) -> list[Hit]:
+        if not self.chunks:
+            return []
+        q = self.store.encode([query])[0]
+        # Both sides are unit-length, so the dot product is cosine similarity.
+        scores = self.matrix @ q
+        # Ties break on index, matching BM25, so the sweep is order-stable.
+        order = sorted(range(len(self.chunks)), key=lambda i: (-float(scores[i]), i))[:k]
+        return [
+            Hit(chunk=self.chunks[i], score=float(scores[i]), rank=r + 1)
+            for r, i in enumerate(order)
+        ]
+
+
+@lru_cache(maxsize=2)
+def default_store(*, live: bool = False) -> EmbeddingStore:
+    return EmbeddingStore.load(DEFAULT_CACHE, live=live)
+
+
+def build_retriever(name: str, chunks: list[Chunk], *, store: EmbeddingStore | None = None):
     if name == "bm25":
         return BM25(chunks)
     if name == "bm25_expanded":
         return ExpandedBM25(chunks)
     if name == "hybrid_rrf":
         return RRFHybrid([BM25(chunks), ExpandedBM25(chunks)])
+    if name == "dense":
+        return DenseRetriever(chunks, store or default_store())
+    if name == "hybrid_dense":
+        # The pairing finding 4 predicted would be worth fusing: two retrievers
+        # that fail differently -- lexical exactness and vocabulary-free
+        # similarity -- rather than BM25 fused with BM25-plus-synonyms.
+        return RRFHybrid([BM25(chunks), DenseRetriever(chunks, store or default_store())])
     raise ValueError(f"unknown retriever {name!r}")
 
 
-RETRIEVERS = ("bm25", "bm25_expanded", "hybrid_rrf")
+RETRIEVERS = ("bm25", "bm25_expanded", "hybrid_rrf", "dense", "hybrid_dense")
